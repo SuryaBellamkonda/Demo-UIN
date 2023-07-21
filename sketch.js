@@ -1,0 +1,281 @@
+let score = 0;
+let scroll = 10;
+let scrollBg = 0;
+let runner;
+let particles = [];
+let backgroundImg;
+let whiteParticleImg;
+let restart = false;
+let runnerImages = [];
+let collisionImage;
+let collisionOccurred = false;
+let scoreCalculated = false;
+let gameTime;
+let stopwatch = 0;
+
+function preload() {
+  backgroundImg = loadImage('bg.jpg');
+  whiteParticleImg = loadImage('white_particle.png');
+  collisionImage = loadImage('collision_image.png');
+
+  // Load the images for the runner
+  runnerImages.push(loadImage('runner.png'));
+  runnerImages.push(loadImage('runner_blue.png'));
+}
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  runner = new Runner();
+
+  createP('Controls: ');
+  createP('Press any key to change the wave to particle. Release the key to revert to the original color!');
+  createP('<hr>');
+  createP('Plot:');
+  createP('Quantum Particle Runner is an exciting game where you control the runner who travels along the quantum path. The path is filled with particles like protons, neutrons, quants, and bad particles. When the runner collides with these particles, interesting things happen. Colliding with protons enlarges the runner, neutrons turn the cloud into blue, quants turn the cloud into gold, and bad particles decrease the size of the runner. Be careful and navigate through the quantum world with precision!');
+  createP('<hr>');
+}
+
+function keyPressed() {
+  if (keyCode === 32) { // 32 is the keycode for the space bar
+    if (restart) {
+      restartGame();
+    } else {
+      runner.setImage('runner_blue'); // Change the runner's image to runner_blue when any key is pressed
+      scoreCalculated = false; // Reset the score calculation
+    }
+  }
+
+  // Added controls to move the runner and runner_blue
+  if (keyCode === UP_ARROW) {
+    runner.moveUp();
+  } else if (keyCode === DOWN_ARROW) {
+    runner.moveDown();
+  }
+}
+
+function keyReleased() {
+  if (keyCode === 32) { // 32 is the keycode for the space bar
+    runner.setImage('runner'); // Change the runner's image back to runner when the key is released
+    scoreCalculated = false; // Reset the score calculation
+  }
+}
+
+function restartGame() {
+  restart = false;
+  score = 0;
+  scrollBg = 0;
+  scroll = 10;
+  particles = [];
+  runner.reset();
+  loop();
+}
+
+function gameOver() {
+  noLoop();
+  fill(255);
+  textSize(24);
+  textAlign(CENTER, CENTER); // Set text alignment to center
+  text(`Game Over! Press any key to restart`, width / 2, height / 2); // Display "Game Over" in the center
+  restart = true;
+}
+
+function draw() {
+  let collisionScore = 0; // Variable to track the score for each collision
+
+  for (let i = particles.length - 1; i >= 0; i--) {
+    let particle = particles[i];
+    particle.move();
+    particle.show();
+
+    if (runner.collide(particle)) {
+      if (particle.type === 'white' && runner.colorIndex === 1) {
+        particle.bounceAway();
+        collisionScore++; // Increment the collision score
+        collisionOccurred = true;
+      } else {
+        gameOver();
+      }
+    }
+
+    if (particle.isOffScreen()) {
+      particles.splice(i, 1);
+    }
+  }
+
+  if (collisionOccurred) {
+    image(collisionImage, width - collisionImage.width - 10, 10);
+  }
+
+  collisionOccurred = false;
+
+  image(backgroundImg, -scrollBg, 0, width, height);
+  image(backgroundImg, -scrollBg + width, 0, width, height);
+
+  if (scrollBg > width) {
+    scrollBg = 0;
+  }
+
+  if (random(1) < 0.75 && frameCount % 50 === 0) {
+    particles.push(new Particle());
+  }
+
+  fill(255);
+  textSize(32);
+  textFont('monospace');
+
+  // Calculate and display the score only when the runner's image is "runner_blue"
+  if (runner.colorIndex === 1) {
+    score += collisionScore; // Add the collision score to the total score
+  }
+  
+  // Display the score just below the timer
+  text(`Score: ${score}`, width / 2, height / 15 + 40); 
+
+  for (let i = particles.length - 1; i >= 0; i--) {
+    let particle = particles[i];
+    particle.move();
+    particle.show();
+
+    if (runner.collide(particle)) {
+      if (particle.type === 'white' && runner.colorIndex === 1) {
+        particle.bounceAway();
+      } else {
+        gameOver();
+      }
+    }
+
+    if (particle.isOffScreen()) {
+      particles.splice(i, 1);
+    }
+  }
+
+  runner.show();
+  runner.move();
+
+  scroll += 0.002;
+  scrollBg += scroll / 5;
+
+  // Update and display game time
+  trackTime();
+}
+
+function trackTime() {
+  let minutes = Math.floor(stopwatch / 60);
+  let seconds = stopwatch % 60;
+  if (seconds < 10) {
+    seconds = '0' + seconds;
+  }
+  if (frameCount % 60 == 0) {
+    stopwatch++;
+  }
+  gameTime = minutes + ":" + seconds;
+
+  textAlign(CENTER, CENTER);
+  textSize(25);
+  text(gameTime, width / 2, height / 15);
+}
+
+class Runner {
+  constructor() {
+    this.size = 50;
+    this.x = (windowWidth - this.size) / 2;
+    this.y = (windowHeight - this.size) / 2; // Set the initial position to the center
+    this.vy = 0;
+    this.gravity = 1;
+    this.colorIndex = 0;
+    this.speed = 10; // Added speed property
+  }
+
+  move() {
+    this.y += this.vy;
+    this.vy += this.gravity;
+    this.y = constrain(this.y, 0, windowHeight - this.size);
+  }
+
+  moveUp() {
+    this.vy = -this.speed; // Move up by setting a negative velocity
+  }
+
+  moveDown() {
+    this.vy = this.speed; // Move down by setting a positive velocity
+  }
+
+  collide(particle) {
+    let hitX = this.x + this.size > particle.x && this.x < particle.x + particle.size;
+    let hitY = this.y + this.size > particle.y && this.y < particle.y + particle.size;
+
+    return hitX && hitY;
+  }
+
+  setImage(imageName) {
+    let imageIndex = 0;
+    if (imageName === 'runner_blue') {
+      imageIndex = 1;
+    }
+    this.colorIndex = imageIndex;
+  }
+
+  reset() {
+    this.size = 50;
+    this.x = (windowWidth - this.size) / 2;
+    this.y = (windowHeight - this.size) / 2; // Set the initial position to the center
+    this.vy = 0;
+    this.colorIndex = 0;
+  }
+
+  show() {
+    let runnerImage = runnerImages[this.colorIndex];
+    image(runnerImage, this.x, this.y, this.size, this.size);
+  }
+}
+
+class Particle {
+  constructor() {
+    this.size = 30;
+    this.x = width;
+    this.y = windowHeight - this.size;
+    this.type = 'white';
+    this.velocity = createVector(0, 0);
+  }
+
+  move() {
+    this.x += this.velocity.x;
+    this.y += this.velocity.y;
+    this.velocity.y += 0.2;
+    this.velocity.mult(0.99);
+
+    if (this.y + this.size > windowHeight) {
+      this.velocity.y *= -0.8;
+
+      if (abs(this.velocity.y) < 1) {
+        this.velocity.y = 0;
+        this.y = windowHeight - this.size;
+      }
+    }
+
+    this.x -= scroll;
+  }
+
+  isOffScreen() {
+    return this.x + this.size < 0;
+  }
+
+  bounceAway() {
+    let angle = radians(45);
+    let distance = dist(this.x, this.y, width, 0);
+    let stepSize = 5;
+    let velocityX = cos(angle) * distance / stepSize;
+    let velocityY = -sin(angle) * distance / stepSize;
+    this.velocity = createVector(velocityX, velocityY);
+    this.x = runner.x + runner.size / 2;
+    this.y = runner.y + runner.size / 2;
+  }
+
+  show() {
+    image(whiteParticleImg, this.x, this.y, this.size, this.size);
+  }
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+}
